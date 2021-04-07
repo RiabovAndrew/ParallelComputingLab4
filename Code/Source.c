@@ -5,6 +5,8 @@
 
 #include "mpi.h"
 
+#define MATRIX_ON_VECTOR
+
 void free_matrix(int** matrix, const int size)
 {
 	for (int i = 0; i < size; i++)
@@ -185,6 +187,8 @@ int main(int argc, char* argv[])
 		print_matrix(matrix, size);
 		print_vector(vector, size);
 
+		double start = MPI_Wtime();
+
 
 		for (int i = 1; i < size; i += task_quantity - 1)
 		{
@@ -198,9 +202,6 @@ int main(int argc, char* argv[])
 
 				matrix_to_array(matrix_copy, arr, size);
 
-				//printf("to send\n");
-				//print_matrix(matrix_copy, size);
-
 				MPI_Send(arr, size * size, MPI_INT, j, 1, MPI_COMM_WORLD);
 				MPI_Send(vector, size, MPI_INT, j, 1, MPI_COMM_WORLD);
 
@@ -213,8 +214,13 @@ int main(int argc, char* argv[])
 			MPI_Recv(arr, size, MPI_INT, i, 1, MPI_COMM_WORLD, &status);
 			sum_vector(result, arr, size);
 		}
+
+		printf("Time with parallelization: %f\n", MPI_Wtime() - start);
 		printf("res\n");
 		print_vector(result, size);
+		start = MPI_Wtime();
+		matrix_on_vector(matrix, vector, size, arr);
+		printf("Time without parallelization: %f\n", MPI_Wtime() - start);
 	}
 	else
 	{
@@ -225,14 +231,18 @@ int main(int argc, char* argv[])
 			MPI_Recv(arr, size * size, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
 			MPI_Recv(vector, size, MPI_INT, 0, 1, MPI_COMM_WORLD, &status);
 			array_to_matrix(matrix, arr, size);
+
+#ifdef MATRIX_ON_VECTOR
 			matrix_on_vector(matrix, vector, size, result);
-			//vector_on_matrix(matrix, vector, size, result);
+#else
+			vector_on_matrix(matrix, vector, size, result);
+#endif
 		}
 		printf("mult\n");
 		print_vector(result, size);
 		MPI_Send(result, size, MPI_INT, 0, 1, MPI_COMM_WORLD);
 	}
-
+	
 	free(result);
 	free(arr);
 	free(vector);
